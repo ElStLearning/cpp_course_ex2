@@ -1,0 +1,18 @@
+Executable ./ex_2/x64/Release/ex2.exe not found.
+Executable ./ex_2/x64/Release/ex2.exe not found.
+Executable ./x64/Release/ex2.exe not found.
+Running ./x64/Release/ex_2.exe ...
+Acting as reader. Wait...
+Program executed successfully.
+File C:\Users\Elena_Smirnova1\TestFiles\TestTest.zip has been copied to C:\Users\Elena_Smirnova1\TestFiles\TestTest_Copy.zip
+Acting as reader. Wait...
+Program executed successfully.
+File C:\Users\Elena_Smirnova1\TestFiles\TestTest.zip has been copied to C:\Users\Elena_Smirnova1\TestFiles\TestTest_Copy.zip
+Acting as reader. Wait...
+Program executed successfully.
+File C:\Users\Elena_Smirnova1\TestFiles\TestTest.zip has been copied to C:\Users\Elena_Smirnova1\TestFiles\TestTest_Copy.zip
+Acting as reader. Wait...
+Program executed successfully.
+File C:\Users\Elena_Smirnova1\TestFiles\TestTest.zip has been copied to C:\Users\Elena_Smirnova1\TestFiles\TestTest_Copy.zip
+Program executed successfully.
+File C:\Users\Elena_Smirnova1\TestFiles\TestTest.zip has been copied to C:\Users\Elena_Smirnova1\TestFiles\TestTest_Copy.zip
