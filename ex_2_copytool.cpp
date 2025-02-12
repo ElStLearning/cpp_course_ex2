@@ -14,18 +14,19 @@
 //Buffer size is 4kb - default page size for many OS
 constexpr std::streamsize BUFFER_SIZE = 4096u;
 
+constexpr size_t BUFFER_READ = 0u;
+constexpr size_t BUFFER_WRITE = 1u;
+
 struct SharedMemoryBuffer
 {
 	boost::interprocess::interprocess_mutex buffer_mutex;
-	boost::interprocess::interprocess_condition buffer_state;
-	bool data_ready = false;
+	boost::interprocess::interprocess_condition buffer_state[2];
+	bool data_ready[2] = { false, false };
 	bool finished = false;
-	char buffer[BUFFER_SIZE];
-	std::streamsize size;
+	char buffer[2][BUFFER_SIZE];
+	std::streamsize size[2];
 
-	SharedMemoryBuffer() : size(0) {}
-
-private:
+	SharedMemoryBuffer() : size{ 0, 0 } {}
 	SharedMemoryBuffer(const SharedMemoryBuffer&) = delete;
 	SharedMemoryBuffer& operator = (const SharedMemoryBuffer&) = delete;
 };
@@ -39,21 +40,27 @@ void ReadFromFile(std::ifstream& fileToRead, boost::interprocess::managed_shared
 	try {
 
 		auto sharedBuffer = segment.find_or_construct<SharedMemoryBuffer>("sharedBuffer")();
+		size_t currentBuffer = BUFFER_READ;
 
 		while (!fileToRead.eof())
 		{
 			boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(sharedBuffer->buffer_mutex);
-			fileToRead.read(sharedBuffer->buffer, BUFFER_SIZE);
-			sharedBuffer->size = fileToRead.gcount();
-			sharedBuffer->data_ready = true;
+			fileToRead.read(sharedBuffer->buffer[currentBuffer], BUFFER_SIZE);
+			sharedBuffer->size[currentBuffer] = fileToRead.gcount();
+			sharedBuffer->data_ready[currentBuffer] = true;
+			sharedBuffer->buffer_state[currentBuffer].notify_one();
 			sharedBuffer->finished = fileToRead.eof();
-			sharedBuffer->buffer_state.notify_one();
 
 			if (!sharedBuffer->finished)
 			{
-				sharedBuffer->buffer_state.wait(lock, [&] { return !sharedBuffer->data_ready; });
+				sharedBuffer->buffer_state[currentBuffer].wait(lock, [&] { return !sharedBuffer->data_ready[currentBuffer]; });
 			}
+
+			currentBuffer = (currentBuffer == BUFFER_READ) ? BUFFER_WRITE : BUFFER_READ;
 		}
+
+		sharedBuffer->buffer_state[BUFFER_READ].notify_all();
+		sharedBuffer->buffer_state[BUFFER_WRITE].notify_all();
 	}
 	catch (const std::exception& e) {
 		std::cerr << "There is an expection in ReadFromFile(): " << e.what() << std::endl;
@@ -71,18 +78,20 @@ void WriteToFile(std::ofstream& fileToWrite, boost::interprocess::managed_shared
 	try
 	{
 		auto sharedBuffer = segment.find_or_construct<SharedMemoryBuffer>("sharedBuffer")();
+		size_t currentBuffer = BUFFER_READ;
 
-		while (!sharedBuffer->finished)
+		while (!sharedBuffer->finished || sharedBuffer->data_ready[currentBuffer])
 		{
 			boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(sharedBuffer->buffer_mutex);
-			sharedBuffer->buffer_state.wait(lock, [&] { return sharedBuffer->data_ready || sharedBuffer->finished; });
+			sharedBuffer->buffer_state[currentBuffer].wait(lock, [&] { return sharedBuffer->data_ready[currentBuffer] || sharedBuffer->finished; });
 
-			if (sharedBuffer->data_ready)
+			if (sharedBuffer->data_ready[currentBuffer])
 			{
-				fileToWrite.write(sharedBuffer->buffer, sharedBuffer->size);
-				sharedBuffer->data_ready = false;
-				sharedBuffer->buffer_state.notify_one();
+				fileToWrite.write(sharedBuffer->buffer[currentBuffer], sharedBuffer->size[currentBuffer]);
+				sharedBuffer->data_ready[currentBuffer] = false;
+				sharedBuffer->buffer_state[currentBuffer].notify_one();
 			}
+			currentBuffer = (currentBuffer == BUFFER_READ) ? BUFFER_WRITE : BUFFER_READ;
 		}
 	}
 	catch (const std::exception& e) {
